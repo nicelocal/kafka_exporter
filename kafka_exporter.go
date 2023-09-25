@@ -49,6 +49,7 @@ var (
 	topicPartitionReplicas             *prometheus.Desc
 	topicPartitionInSyncReplicas       *prometheus.Desc
 	topicPartitionUsesPreferredReplica *prometheus.Desc
+	topicPartitionAssigned             *prometheus.Desc
 	topicUnderReplicatedPartition      *prometheus.Desc
 	consumergroupCurrentOffset         *prometheus.Desc
 	consumergroupCurrentOffsetSum      *prometheus.Desc
@@ -306,6 +307,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	ch <- topicPartitionReplicas
 	ch <- topicPartitionInSyncReplicas
 	ch <- topicPartitionUsesPreferredReplica
+	ch <- topicPartitionAssigned
 	ch <- topicUnderReplicatedPartition
 	ch <- consumergroupCurrentOffset
 	ch <- consumergroupCurrentOffsetSum
@@ -500,6 +502,14 @@ func (e *Exporter) collect(ch chan<- prometheus.Metric) {
 							consumergroupLagZookeeper, prometheus.GaugeValue, float64(consumerGroupLag), group.Name, topic, strconv.FormatInt(int64(partition), 10),
 						)
 					}
+					owner, _ := group.PartitionOwner(topic, partition)
+					assigned := float64(0.0)
+					if owner != nil {
+						assigned = 1.0
+					}
+					ch <- prometheus.MustNewConstMetric(
+						topicPartitionAssigned, prometheus.GaugeValue, assigned, group.Name, topic, strconv.FormatInt(int64(partition), 10),
+					)
 				}
 			}
 		}
@@ -847,6 +857,12 @@ func setup(
 	topicPartitionUsesPreferredReplica = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, "topic", "partition_leader_is_preferred"),
 		"1 if Topic/Partition is using the Preferred Broker",
+		[]string{"topic", "partition"}, labels,
+	)
+
+	topicPartitionAssigned = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, "topic", "partition_assigned"),
+		"1 if a Topic/Partition is assigned",
 		[]string{"topic", "partition"}, labels,
 	)
 
